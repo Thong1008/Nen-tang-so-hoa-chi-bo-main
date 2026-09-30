@@ -9,6 +9,7 @@
 // 1. CẤU HÌNH VÀ KHỞI TẠO SUPABASE CLIENT
 // Thay thế SUPABASE_URL và SUPABASE_ANON_KEY bằng thông tin cấu hình trong Project Settings -> API của bạn
 import { createClient } from '@supabase/supabase-js';
+import { PartyMember } from '../types/partyMember';
 
 const SUPABASE_URL = 'https://cboajmbpiqglesncgvve.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNib2FqbWJwaXFnbGVzbmNndnZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2NzAyODQsImV4cCI6MjEwNjI0NjI4NH0.ET3HkfOKUU_DE8V0HA8EYqwNazX16FeR6s2JrTP03Wc';
@@ -22,28 +23,27 @@ const AUTH_EMAIL_DOMAIN = '@chi-bo.local';
 // ==============================================================================
 // 1. HÀM KHỞI TẠO TÀI KHOẢN HÀNG LOẠT (BULK CREATE ACCOUNTS)
 // ==============================================================================
-/**
- * Tự động tạo tài khoản hàng loạt cho danh sách Đảng viên
- * @param {Array<Object>} danhSachDangVien - Mảng các Đảng viên từ bảng dữ liệu
- * Cấu trúc mẫu mỗi phần tử:
- * {
- *   id: 'dv-01',
- *   full_name: 'Nguyễn Anh Toàn',
- *   citizen_id: '046088001248', // Bắt buộc: dùng làm tên đăng nhập và mật khẩu gốc
- *   position: 'Bí thư Chi bộ - Chủ nhiệm Hậu cần - Kỹ thuật',
- *   military_rank: 'Trung tá',
- *   phone: '0914.288.765'
- * }
- */
-export async function khoiTaoTaiKhoanHangLoat(danhSachDangVien) {
+export interface BulkAccountItem {
+  id?: string;
+  full_name?: string;
+  citizen_id?: string;
+  position?: string;
+  military_rank?: string;
+  phone?: string;
+}
+
+export async function khoiTaoTaiKhoanHangLoat(danhSachDangVien: (BulkAccountItem | PartyMember)[]) {
   console.log(`[Bắt đầu] Khởi tạo tài khoản cho ${danhSachDangVien.length} Đảng viên...`);
-  const ketQua = {
+  const ketQua: {
+    thanhCong: Array<{ ten?: string; cccd: string; email: string; vaiTro: string }>;
+    thatBai: Array<{ ten?: string; cccd?: string; lyDo: string }>;
+  } = {
     thanhCong: [],
     thatBai: []
   };
 
   for (const dv of danhSachDangVien) {
-    const cccd = String(dv.citizen_id).trim();
+    const cccd = String(dv.citizen_id || '').trim();
 
     if (!cccd) {
       console.warn(`Bỏ qua đồng chí ${dv.full_name}: Không có số CCCD`);
@@ -121,9 +121,10 @@ export async function khoiTaoTaiKhoanHangLoat(danhSachDangVien) {
       });
 
       console.log(`✓ Đã tạo xong tài khoản: ${dv.full_name} (${cccd}) - Vai trò: ${vaiTro}`);
-    } catch (err) {
-      console.error(`✕ Lỗi khi tạo tài khoản đồng chí ${dv.full_name}:`, err.message);
-      ketQua.thatBai.push({ ten: dv.full_name, cccd: cccd, lyDo: err.message });
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error(`✕ Lỗi khi tạo tài khoản đồng chí ${dv.full_name}:`, errMsg);
+      ketQua.thatBai.push({ ten: dv.full_name, cccd: cccd, lyDo: errMsg });
     }
   }
 
@@ -135,23 +136,16 @@ export async function khoiTaoTaiKhoanHangLoat(danhSachDangVien) {
 // ==============================================================================
 // 2. HÀM XỬ LÝ ĐĂNG NHẬP VÀ PHÂN QUYỀN ĐIỀU HƯỚNG (LOGIN & REDIRECT)
 // ==============================================================================
-/**
- * Xử lý sự kiện khi bấm nút "ĐĂNG NHẬP VÀO HỆ THỐNG"
- * @param {string} soCCCD - Số CCCD hoặc Số thứ tự được nhập từ ô Tài khoản
- * @param {string} matKhau - Mật khẩu người dùng nhập
- */
-export async function xuLyDangNhapVaDieuHuong(soCCCD, matKhau) {
+export async function xuLyDangNhapVaDieuHuong(soCCCD: string, matKhau: string) {
   const cccdClean = String(soCCCD).trim();
   const matKhauClean = String(matKhau).trim();
 
   // Kiểm tra dữ liệu đầu vào
   if (!cccdClean) {
-    alert('Đồng chí vui lòng nhập Số CCCD hoặc Tài khoản!');
     return { success: false, message: 'Thiếu tài khoản' };
   }
 
   if (!matKhauClean) {
-    alert('Đồng chí vui lòng nhập Mật khẩu!');
     return { success: false, message: 'Thiếu mật khẩu' };
   }
 
@@ -166,7 +160,6 @@ export async function xuLyDangNhapVaDieuHuong(soCCCD, matKhau) {
     });
 
     if (error) {
-      alert('Đăng nhập không thành công! Vui lòng kiểm tra lại Số CCCD hoặc Mật khẩu.');
       return { success: false, error: error.message };
     }
 
@@ -175,7 +168,6 @@ export async function xuLyDangNhapVaDieuHuong(soCCCD, matKhau) {
 
     // Bước 2: Truy vấn thông tin vai trò (Role) từ bảng `profiles`
     let vaiTro = user.user_metadata?.role || 'Dang_vien';
-    let isFirstLogin = user.user_metadata?.is_first_login;
 
     const { data: profileData, error: profileErr } = await supabase
       .from('profiles')
@@ -185,41 +177,13 @@ export async function xuLyDangNhapVaDieuHuong(soCCCD, matKhau) {
 
     if (!profileErr && profileData) {
       vaiTro = profileData.role;
-      isFirstLogin = profileData.is_first_login;
-    }
-
-    // Bước 3: Kiểm tra nếu là Đảng viên đăng nhập lần đầu bằng mật khẩu mặc định (CCCD)
-    if (matKhauClean === cccdClean || isFirstLogin === true) {
-      const batBuocDoi = confirm(
-        `Chào mừng đồng chí ${profileData?.full_name || ''}!\n` +
-        `Đây là lần đầu đồng chí đăng nhập bằng mật khẩu mặc định (CCCD).\n` +
-        `Để đảm bảo an toàn bí mật quân sự, đồng chí vui lòng đổi mật khẩu mới ngay bây giờ!`
-      );
-
-      if (batBuocDoi) {
-        const matKhauMoi = prompt('Nhập mật khẩu mới của đồng chí (tối thiểu 6 ký tự):');
-        if (matKhauMoi && matKhauMoi.length >= 6) {
-          await doiMatKhauLanDau(matKhauMoi, cccdClean);
-        } else {
-          alert('Mật khẩu chưa được đổi. Đồng chí có thể cập nhật lại trong mục Hồ sơ cá nhân.');
-        }
-      }
-    }
-
-    // Bước 4: Phân quyền điều hướng (Redirect)
-    if (vaiTro === 'Bi_thu' || vaiTro === 'Pho_bi_thu') {
-      console.log('Điều hướng vào trang Quản trị Chi bộ (admin_dashboard.html)...');
-      window.location.href = 'admin_dashboard.html';
-    } else {
-      console.log('Điều hướng vào Cổng Đảng viên tự phục vụ (member_portal.html)...');
-      window.location.href = 'member_portal.html';
     }
 
     return { success: true, user, role: vaiTro };
-  } catch (err) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error('Lỗi trong quá trình đăng nhập:', err);
-    alert('Đã xảy ra sự cố kết nối. Vui lòng thử lại!');
-    return { success: false, error: err.message };
+    return { success: false, error: errMsg };
   }
 }
 
@@ -227,14 +191,8 @@ export async function xuLyDangNhapVaDieuHuong(soCCCD, matKhau) {
 // ==============================================================================
 // 3. HÀM ĐỔI MẬT KHẨU LẦN ĐẦU (CHANGE PASSWORD)
 // ==============================================================================
-/**
- * Đổi sang mật khẩu mới an toàn và hủy cờ đăng nhập lần đầu
- * @param {string} matKhauMoi - Mật khẩu mới người dùng muốn thiết lập
- * @param {string} [soCCCD] - Số CCCD của Đảng viên (dùng để cập nhật bảng profiles)
- */
-export async function doiMatKhauLanDau(matKhauMoi, soCCCD) {
+export async function doiMatKhauLanDau(matKhauMoi: string, soCCCD?: string) {
   if (!matKhauMoi || matKhauMoi.trim().length < 6) {
-    alert('Mật khẩu mới phải có độ dài tối thiểu từ 6 ký tự trở lên!');
     return { success: false, message: 'Mật khẩu quá ngắn' };
   }
 
@@ -248,7 +206,6 @@ export async function doiMatKhauLanDau(matKhauMoi, soCCCD) {
     });
 
     if (error) {
-      alert(`Đổi mật khẩu thất bại: ${error.message}`);
       return { success: false, error: error.message };
     }
 
@@ -263,11 +220,10 @@ export async function doiMatKhauLanDau(matKhauMoi, soCCCD) {
         .eq('citizen_id', soCCCD);
     }
 
-    alert('Đổi mật khẩu thành công! Mật khẩu mới đã được lưu an toàn vào hệ thống.');
     return { success: true, data };
-  } catch (err) {
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     console.error('Lỗi cập nhật mật khẩu:', err);
-    alert('Có lỗi xảy ra khi cập nhật mật khẩu. Vui lòng thử lại!');
-    return { success: false, error: err.message };
+    return { success: false, error: errMsg };
   }
 }

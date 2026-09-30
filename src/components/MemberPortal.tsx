@@ -29,8 +29,9 @@ interface MemberPortalProps {
   members: PartyMember[];
   hosoUpdates: HosoUpdateRecord[];
   onUpdateHosoList: (newList: HosoUpdateRecord[]) => void;
-  onLogout: () => void;
+  onLogout?: () => void;
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
+  embedded?: boolean;
 }
 
 export const MemberPortal: React.FC<MemberPortalProps> = ({
@@ -40,6 +41,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
   onUpdateHosoList,
   onLogout,
   showToast,
+  embedded = false,
 }) => {
   // Tìm hồ sơ chi tiết của đồng chí đang đăng nhập
   const member = useMemo(() => {
@@ -218,56 +220,60 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 font-interface flex flex-col">
-      {/* 1. HEADER RIÊNG CHO ĐẢNG VIÊN (Ẩn hoàn toàn menu quản trị bên trái) */}
-      <header className="bg-slate-900 text-white border-b border-slate-800 shadow-md shrink-0 sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-red-800 ring-2 ring-amber-400 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
-              <img
-                src="/logo.jpg"
-                alt="Logo"
-                className="w-full h-full object-cover"
-                onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-              />
-            </div>
-            <div>
-              <div className="text-xs font-bold text-amber-400 tracking-wider">
-                CHI BỘ BAN HẬU CẦN - KỸ THUẬT
+    <div className={embedded ? "w-full max-w-5xl mx-auto space-y-5 font-interface pb-6" : "min-h-screen bg-slate-100 font-interface flex flex-col"}>
+      {/* 1. HEADER RIÊNG CHO ĐẢNG VIÊN (Chỉ hiển thị khi chạy độc lập, ẩn khi lồng trong Unified UI) */}
+      {!embedded && (
+        <header className="bg-slate-900 text-white border-b border-slate-800 shadow-md shrink-0 sticky top-0 z-30">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-800 ring-2 ring-amber-400 flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+                <img
+                  src="/logo.jpg"
+                  alt="Logo"
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                />
               </div>
-              <h1 className="text-sm font-semibold text-slate-100 flex items-center gap-1.5">
-                <span>Cổng Đảng Viên Tự Phục Vụ</span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-mono">
-                  {member.id.toUpperCase()}
-                </span>
-              </h1>
+              <div>
+                <div className="text-xs font-bold text-amber-400 tracking-wider">
+                  CHI BỘ BAN HẬU CẦN - KỸ THUẬT
+                </div>
+                <h1 className="text-sm font-semibold text-slate-100 flex items-center gap-1.5">
+                  <span>Cổng Đảng Viên Tự Phục Vụ</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 font-mono">
+                    {member.id.toUpperCase()}
+                  </span>
+                </h1>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:block text-right">
+                <div className="text-xs font-bold text-slate-200">
+                  {member.military_rank} {member.full_name}
+                </div>
+                <div className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                  {member.position}
+                </div>
+              </div>
+
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-red-950 text-slate-300 hover:text-red-200 border border-slate-700 hover:border-red-800 transition-colors text-xs font-semibold cursor-pointer shadow-xs"
+                  title="Đăng xuất khỏi Cổng Đảng viên"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Đăng Xuất</span>
+                </button>
+              )}
             </div>
           </div>
+        </header>
+      )}
 
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:block text-right">
-              <div className="text-xs font-bold text-slate-200">
-                {member.military_rank} {member.full_name}
-              </div>
-              <div className="text-[11px] text-slate-400 truncate max-w-[200px]">
-                {member.position}
-              </div>
-            </div>
-
-            <button
-              onClick={onLogout}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-red-950 text-slate-300 hover:text-red-200 border border-slate-700 hover:border-red-800 transition-colors text-xs font-semibold cursor-pointer shadow-xs"
-              title="Đăng xuất khỏi Cổng Đảng viên"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Đăng Xuất</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* 2. KHỐI NỘI DUNG DUY NHẤT: HỒ SƠ ĐẢNG VIÊN CÁ NHÂN */}
-      <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-5">
+      {/* 2. KHỐI NỘI DUNG: HỒ SƠ ĐẢNG VIÊN CÁ NHÂN */}
+      <div className={embedded ? "space-y-5" : "flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 space-y-5"}>
         {/* Banner thông báo các yêu cầu đang chờ Bí thư duyệt */}
         {pendingCount > 0 && (
           <div className="bg-amber-50 border border-amber-300 p-4 rounded-xl shadow-xs flex items-center justify-between gap-3 text-xs">
@@ -581,7 +587,7 @@ export const MemberPortal: React.FC<MemberPortalProps> = ({
             </div>
           )}
         </div>
-      </main>
+      </div>
 
       {/* 4. MODAL YÊU CẦU CHỈNH SỬA (SELF-SERVICE REQUEST MODAL) */}
       {editingCategory && (

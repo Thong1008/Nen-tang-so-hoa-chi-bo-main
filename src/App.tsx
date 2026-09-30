@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { ActiveTab, PartyMember, EvaluationGrade } from './types/partyMember';
+import { ActiveTab, PartyMember } from './types/partyMember';
 import { Achievement, CreateAchievementDTO } from './types/achievement';
 import { AuthUser, HosoUpdateRecord } from './types/hosoUpdate';
 import { Navigation } from './components/Navigation';
@@ -10,7 +10,6 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { EvaluationModule } from './components/EvaluationModule';
 import { SettingsView } from './components/SettingsView';
 import { LoginView } from './components/LoginView';
-import { MemberPortal } from './components/MemberPortal';
 import { HosoApprovalModal } from './components/HosoApprovalModal';
 import { 
   getStoredAuthUser, 
@@ -36,7 +35,7 @@ import {
   fetchAllAchievements, 
   submitAchievementRequest, 
   approveAchievement, 
-  rejectAchievement,
+  rejectAchievement, 
   countPendingAchievements 
 } from './utils/achievementService';
 import { 
@@ -48,11 +47,12 @@ import {
   Info,
   ShieldAlert,
   LogOut,
-  Bell
+  Bell,
+  UserCheck
 } from 'lucide-react';
 
 export default function App() {
-  // 1. Quản lý trạng thái Đăng nhập & Phân quyền
+  // 1. Quản lý trạng thái Đăng nhập
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => getStoredAuthUser());
 
   // 2. Dữ liệu chính Chi bộ
@@ -122,15 +122,10 @@ export default function App() {
   // Đăng nhập thành công
   const handleLoginSuccess = (user: AuthUser) => {
     setCurrentUser(user);
-    showToast(
-      user.role === 'admin'
-        ? `Chào mừng Bí thư / Phó Bí thư ${user.full_name}`
-        : `Chào mừng đồng chí ${user.full_name}`,
-      'success'
-    );
+    showToast(`Chào mừng đồng chí ${user.military_rank} ${user.full_name}`, 'success');
   };
 
-  // Số lượng yêu cầu thay đổi hồ sơ đang chờ Bí thư duyệt
+  // Số lượng yêu cầu thay đổi hồ sơ đang chờ duyệt
   const pendingHosoUpdatesCount = useMemo(() => {
     return hosoUpdates.filter((u) => u.trang_thai === 'pending').length;
   }, [hosoUpdates]);
@@ -225,10 +220,10 @@ export default function App() {
     showToast(`Đã khôi phục ${backupMembers.length} hồ sơ Đảng viên`, 'success');
   };
 
-  // Tiêu đề các tab (đã xóa bỏ dòng phụ tại list theo yêu cầu)
+  // Tiêu đề các tab đồng nhất cho toàn bộ hệ thống
   const tabTitles: Record<ActiveTab, { title: string; subtitle?: string }> = {
     list: {
-      title: 'Danh Sách Trích Ngang Đảng Viên',
+      title: 'Danh Sách Trích Ngang Toàn Chi Bộ',
     },
     analytics: {
       title: 'Báo Cáo Phân Tích & Thống Kê Cơ Cấu',
@@ -245,7 +240,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // TRƯỜNG HỢP 1: CHƯA ĐĂNG NHẬP -> HIỂN THỊ GIAO DIỆN LOGIN
+  // TRƯỜNG HỢP: CHƯA ĐĂNG NHẬP -> HIỂN THỊ GIAO DIỆN LOGIN
   // =========================================================================
   if (!currentUser) {
     return (
@@ -268,39 +263,8 @@ export default function App() {
   }
 
   // =========================================================================
-  // TRƯỜNG HỢP 2: ĐẢNG VIÊN THƯỜNG -> CỔNG ĐẢNG VIÊN TỰ PHỤC VỤ (MEMBER PORTAL)
-  // Ẩn hoàn toàn menu quản trị bên trái, chỉ hiển thị trang hồ sơ cá nhân
-  // =========================================================================
-  if (currentUser.role === 'member') {
-    return (
-      <>
-        <MemberPortal
-          currentUser={currentUser}
-          members={members}
-          hosoUpdates={hosoUpdates}
-          onUpdateHosoList={setHosoUpdates}
-          onLogout={handleLogout}
-          showToast={showToast}
-        />
-
-        {toast && (
-          <div className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl text-xs font-semibold text-white transition-all bg-slate-900 border border-slate-700">
-            {toast.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            ) : toast.type === 'error' ? (
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-            ) : (
-              <Info className="w-4 h-4 text-amber-400 shrink-0" />
-            )}
-            <span>{toast.message}</span>
-          </div>
-        )}
-      </>
-    );
-  }
-
-  // =========================================================================
-  // TRƯỜNG HỢP 3: BÍ THƯ / PHÓ BÍ THƯ (ADMIN) -> GIAO DIỆN QUẢN TRỊ ĐẦY ĐỦ
+  // GIAO DIỆN HỢP NHẤT DUY NHẤT (SINGLE UNIFIED PORTAL)
+  // Đồng nhất 100% giao diện giữa Đảng viên và Bí thư
   // =========================================================================
   return (
     <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-slate-100 font-interface">
@@ -316,6 +280,7 @@ export default function App() {
           setEditingMember(null);
           setIsAddEditModalOpen(true);
         }}
+        currentUser={currentUser}
       />
 
       {/* 2. VÙNG NỘI DUNG CHÍNH (Main Content Area) */}
@@ -372,7 +337,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* Header trên Desktop (>= 768px): Tinh gọn, sang trọng, đầy đủ công cụ */}
+        {/* Header trên Desktop (>= 768px): Tinh gọn, trang trọng, đồng nhất */}
         <header className="hidden md:flex h-16 bg-white border-b border-slate-200/90 px-6 items-center justify-between shrink-0 shadow-2xs z-10">
           <div>
             <h1 className="text-base font-bold text-slate-900 tracking-tight">
@@ -385,28 +350,29 @@ export default function App() {
             )}
           </div>
 
-          {/* Công cụ & Primary Action theo ngữ cảnh */}
+          {/* Công cụ & Primary Action đồng nhất */}
           <div className="flex items-center gap-3">
             {/* Nút xem xét yêu cầu thay đổi lý lịch Đảng viên nếu có pending */}
             {pendingHosoUpdatesCount > 0 && (
               <button
                 onClick={() => setIsHosoApprovalModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 transition-all cursor-pointer shadow-2xs animate-pulse"
-                title="Nhấp để xem xét và phê duyệt các yêu cầu thay đổi hồ sơ từ Đảng viên"
+                title="Nhấp để xem xét và phê duyệt các yêu cầu thay đổi hồ sơ"
               >
                 <Bell className="w-3.5 h-3.5 text-amber-700" />
-                <span>{pendingHosoUpdatesCount} Yêu cầu sửa hồ sơ chờ duyệt</span>
+                <span>{pendingHosoUpdatesCount} Yêu cầu sửa hồ sơ</span>
               </button>
             )}
 
-            {/* Thông tin Bí thư đang đăng nhập */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs">
-              <ShieldAlert className="w-3.5 h-3.5 text-red-800" />
-              <span className="text-slate-600">
-                Vai trò: <strong className="text-slate-900">{currentUser.military_rank} {currentUser.full_name}</strong> (Bí thư)
+            {/* Thông tin định danh đồng chí đang đăng nhập */}
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs text-slate-800">
+              <UserCheck className="w-3.5 h-3.5 text-red-800" />
+              <span>
+                Đồng chí: <strong className="text-slate-900">{currentUser.military_rank} {currentUser.full_name}</strong> ({currentUser.position})
               </span>
             </div>
 
+            {/* Nút Thêm mới tại tab Hồ sơ */}
             {activeTab === 'list' && (
               <button
                 onClick={() => {
@@ -420,6 +386,7 @@ export default function App() {
               </button>
             )}
 
+            {/* Nút Làm Mới tại tab Cài đặt */}
             {activeTab === 'settings' && (
               <button
                 onClick={loadData}
@@ -443,17 +410,18 @@ export default function App() {
           </div>
         </header>
 
-        {/* Khối Nội Dung Tab chính */}
+        {/* Khối Nội Dung Tab chính (Đồng nhất cho tất cả tài khoản) */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-6 pb-24 md:pb-6 custom-scrollbar">
           {loading ? (
             <div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-3">
               <RefreshCw className="w-8 h-8 animate-spin text-red-700" />
               <div className="text-sm font-medium text-slate-600">
-                Đang nạp hồ sơ Đảng viên...
+                Đang nạp hồ sơ Chi bộ...
               </div>
             </div>
           ) : (
             <>
+              {/* TAB 1: DANH SÁCH TRÍCH NGANG ĐẢNG VIÊN */}
               {activeTab === 'list' && (
                 <MemberList
                   members={members}
@@ -467,14 +435,21 @@ export default function App() {
                 />
               )}
 
+              {/* TAB 2: BÁO CÁO PHÂN TÍCH & THỐNG KÊ */}
               {activeTab === 'analytics' && (
                 <AnalyticsView members={members} />
               )}
 
+              {/* TAB 3: ĐÁNH GIÁ, XẾP LOẠI & BỎ PHIẾU TÍN NHIỆM */}
               {activeTab === 'evaluation' && (
-                <EvaluationModule members={members} />
+                <EvaluationModule 
+                  members={members} 
+                  currentUser={currentUser}
+                  isAdmin={true}
+                />
               )}
 
+              {/* TAB 4: CÀI ĐẶT HỆ THỐNG & ĐỒNG BỘ */}
               {activeTab === 'settings' && (
                 <SettingsView
                   members={members}
@@ -501,7 +476,7 @@ export default function App() {
         existingCount={members.length}
       />
 
-      {/* Modal: Phê duyệt Yêu cầu thay đổi hồ sơ (hoso_updates) */}
+      {/* Modal: Phê duyệt Yêu cầu thay đổi hồ sơ */}
       <HosoApprovalModal
         isOpen={isHosoApprovalModalOpen}
         onClose={() => setIsHosoApprovalModalOpen(false)}

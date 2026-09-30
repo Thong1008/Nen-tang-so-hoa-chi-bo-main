@@ -112,9 +112,6 @@ export const MemberList: React.FC<MemberListProps> = ({
               Có <strong>{pendingTotal}</strong> đề xuất khen thưởng/danh hiệu mới đang chờ <strong>Bí thư Chi bộ</strong> xem xét và phê duyệt.
             </span>
           </div>
-          <span className="text-[11px] font-semibold text-amber-800 hidden sm:inline">
-            (Bấm vào bất kỳ dòng nào để xem hồ sơ & duyệt)
-          </span>
         </div>
       )}
 
@@ -228,7 +225,7 @@ export const MemberList: React.FC<MemberListProps> = ({
                       key={member.id}
                       onClick={() => onViewMember(member)}
                       className="hover:bg-amber-50/60 transition-colors group cursor-pointer"
-                      title="Nhấp chuột để mở Hồ sơ Đảng viên chi tiết"
+                      title="Xem hồ sơ Đảng viên chi tiết"
                     >
                       {/* 1. STT */}
                       <td className="py-2.5 px-2 text-center text-slate-700 font-medium border-r border-slate-200">

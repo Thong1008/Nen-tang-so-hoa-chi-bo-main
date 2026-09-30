@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { PartyMember } from '../types/partyMember';
+import { AuthUser } from '../types/hosoUpdate';
 import { 
   RatingLevel, 
   RATING_LEVELS, 
@@ -30,19 +31,25 @@ import {
   ChevronRight, 
   Star, 
   Send, 
-  Info,
-  Clock,
-  Sparkles,
-  Zap,
-  Eye,
-  Check
+  Info, 
+  Clock, 
+  Sparkles, 
+  Zap, 
+  Eye, 
+  Check 
 } from 'lucide-react';
 
 interface EvaluationModuleProps {
   members: PartyMember[];
+  currentUser?: AuthUser | null;
+  isAdmin?: boolean;
 }
 
-export const EvaluationModule: React.FC<EvaluationModuleProps> = ({ members }) => {
+export const EvaluationModule: React.FC<EvaluationModuleProps> = ({ 
+  members,
+  currentUser,
+  isAdmin = false,
+}) => {
   const [periodId, setPeriodId] = useState<string>('2026-09');
   const [ballots, setBallots] = useState<PeerBallot[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -50,8 +57,19 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({ members }) =
   const [periodInfo, setPeriodInfo] = useState<EvaluationPeriodInfo>(CURRENT_PERIOD);
 
   // Role switching: Secretary (dv-01) vs Member Voter
-  const [currentVoterId, setCurrentVoterId] = useState<string>('dv-04'); // Default to a young comrade
-  const [isSecretaryRole, setIsSecretaryRole] = useState<boolean>(false);
+  // Nếu là Đảng viên thường: luôn cố định chế độ cử tri (isSecretaryRole = false) và voterId = id của họ
+  const [currentVoterId, setCurrentVoterId] = useState<string>(() => {
+    if (!isAdmin && currentUser) return currentUser.id;
+    return 'dv-01';
+  });
+  const [isSecretaryRole, setIsSecretaryRole] = useState<boolean>(isAdmin);
+
+  useEffect(() => {
+    if (!isAdmin && currentUser) {
+      setIsSecretaryRole(false);
+      setCurrentVoterId(currentUser.id);
+    }
+  }, [isAdmin, currentUser]);
 
   // Current voter's ratings in memory: { targetId: RatingLevel }
   const [currentVotes, setCurrentVotes] = useState<Record<string, RatingLevel>>({});
@@ -215,17 +233,14 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({ members }) =
       {/* 1. THANH ĐIỀU HƯỚNG VAI TRÒ & TIẾN ĐỘ TỔNG QUAN */}
       <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200/90 shadow-2xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Bộ chọn vai trò tinh gọn */}
+          {/* Bộ chọn chế độ xem thống nhất cho tất cả Đảng viên và Bí thư */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Chế độ truy cập:
+              Nội dung xem:
             </span>
             <div className="inline-flex rounded-lg border border-slate-300 p-0.5 bg-slate-100 text-xs">
               <button
-                onClick={() => {
-                  setIsSecretaryRole(true);
-                  setCurrentVoterId('dv-01');
-                }}
+                onClick={() => setIsSecretaryRole(true)}
                 className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                   isSecretaryRole
                     ? 'bg-red-800 text-white shadow-xs'
@@ -233,13 +248,13 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({ members }) =
                 }`}
               >
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-300" />
-                <span>Bí thư Chi bộ (Chủ tọa)</span>
+                <span>Bảng Tổng Hợp Xếp Hạng</span>
               </button>
 
               <button
                 onClick={() => {
                   setIsSecretaryRole(false);
-                  if (currentVoterId === 'dv-01') setCurrentVoterId('dv-04');
+                  if (currentUser) setCurrentVoterId(currentUser.id);
                 }}
                 className={`px-3 py-1.5 rounded-md font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                   !isSecretaryRole
@@ -248,13 +263,13 @@ export const EvaluationModule: React.FC<EvaluationModuleProps> = ({ members }) =
                 }`}
               >
                 <UserCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Đảng viên bỏ phiếu tín nhiệm</span>
+                <span>Bỏ Phiếu Tín Nhiệm (20 đ/c)</span>
               </button>
             </div>
           </div>
 
-          {/* Chọn tài khoản Đảng viên cụ thể nếu đang ở chế độ Cử tri */}
-          {!isSecretaryRole && (
+          {/* Chọn tài khoản Đảng viên cụ thể nếu đang ở chế độ Cử tri và là Admin */}
+          {!isSecretaryRole && isAdmin && (
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium text-slate-600">Đăng nhập tài khoản:</span>
               <select

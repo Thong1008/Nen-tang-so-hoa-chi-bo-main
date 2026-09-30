@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ActiveTab, PartyMember } from '../types/partyMember';
+import { AuthUser } from '../types/hosoUpdate';
 import { exportPartyMembersToWord } from '../utils/exportWord';
 import { 
   Users, 
@@ -20,6 +21,7 @@ interface NavigationProps {
   members: PartyMember[];
   pendingAchievementsCount?: number;
   onOpenAddModal: () => void;
+  currentUser?: AuthUser | null;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -29,15 +31,17 @@ export const Navigation: React.FC<NavigationProps> = ({
   totalMembers,
   members,
   pendingAchievementsCount = 0,
+  currentUser,
 }) => {
   const [imageError, setImageError] = useState(false);
+  const isMember = currentUser?.role === 'member';
 
   const navItems = [
     {
       id: 'list' as ActiveTab,
       label: 'Hồ sơ',
       desktopLabel: 'Danh sách trích ngang',
-      sublabel: `Hồ sơ ${totalMembers} Đảng viên (HD 05)`,
+      sublabel: `Hồ sơ ${totalMembers} Đảng viên`,
       icon: Users,
       badge: pendingAchievementsCount > 0 ? pendingAchievementsCount : undefined,
     },
