@@ -1,0 +1,6 @@
+{
+  "name": "Quản lý Đảng viên - LLVT Thành phố Huế",
+  "description": "Hệ thống Quản lý Đảng viên Chi bộ Cơ sở - Lực lượng Vũ trang TP Huế (Chi bộ Hậu cần - Kỹ thuật)",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
