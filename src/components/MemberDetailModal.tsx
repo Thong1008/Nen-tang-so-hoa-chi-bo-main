@@ -1,33 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PartyMember } from '../types/partyMember';
-import { 
-  Achievement, 
-  CreateAchievementDTO, 
-  COMMON_ACHIEVEMENT_TITLES, 
-  DECISION_AUTHORITIES 
+
+import {
+  Achievement,
+  CreateAchievementDTO,
+  COMMON_ACHIEVEMENT_TITLES,
+  DECISION_AUTHORITIES
 } from '../types/achievement';
-import { 
-  X, 
-  Shield, 
-  MapPin, 
-  Phone, 
-  Award, 
-  Calendar, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
-  PlusCircle, 
-  Send, 
-  Check, 
-  XCircle, 
-  UserCheck, 
-  ShieldAlert, 
+import {
+  X,
+  Shield,
+  MapPin,
+  Phone,
+  Award,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  PlusCircle,
+  Send,
+  Check,
+  XCircle,
+  UserCheck,
+  ShieldAlert,
   FileText,
   Building,
   User,
   Medal,
   ChevronRight
 } from 'lucide-react';
+import { insertAwardProposal, AwardProposalInput, getPartyAwards } from '../utils/supabaseService';
 
 interface MemberDetailModalProps {
   member: PartyMember | null;
@@ -54,7 +56,8 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
   onApproveAchievement,
   onRejectAchievement,
 }) => {
-  const [activeTab, setActiveTab] = useState<ModalTab>('achievements'); // Default to achievements as requested
+  // Sửa giá trị mặc định từ 'achievements' thành 'info'
+  const [activeTab, setActiveTab] = useState<ModalTab>('info');
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
 
   // Form state for self-service proposal
@@ -63,6 +66,28 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
   const [formDecisionBy, setFormDecisionBy] = useState<string>('Bộ Chỉ huy Quân sự Tỉnh Thừa Thiên Huế');
   const [formNotes, setFormNotes] = useState<string>('');
   const [submittingForm, setSubmittingForm] = useState<boolean>(false);
+  // --- ĐOẠN CODE CHÈN THÊM VÀO DÒNG 68 ---
+  // State lưu danh sách dữ liệu thật từ Supabase của riêng Đảng viên này
+  const [supabaseAchievements, setSupabaseAchievements] = useState<any[]>([]);
+
+  // Hàm tải dữ liệu chính thức từ Supabase
+    const loadSupabaseData = async () => {
+    if (!member?.id) return;
+    try {
+      // Gọi hàm getPartyAwards từ file service đã import ở dòng 31 để tránh lỗi 'Cannot find name supabase'
+      const data = await getPartyAwards(member.id);
+      setSupabaseAchievements(data || []);
+    } catch (err) {
+      console.error("Lỗi khi tải danh hiệu Supabase:", err);
+    }
+  };
+
+
+  // Tự động gọi lại hàm tải dữ liệu khi mở Modal hoặc đổi Đảng viên
+  useEffect(() => {
+    loadSupabaseData();
+  }, [member?.id]);
+  // --- KẾT THÚC ĐOẠN CHÈN ---
 
   // Rejection prompt state
   const [rejectingId, setRejectingId] = useState<string | null>(null);
@@ -71,30 +96,57 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
   if (!member) return null;
 
   // Filter achievements for this member
-  const memberAchievements = achievements.filter(a => a.member_id === member.id);
+  const memberAchievements = supabaseAchievements.filter(a => a.member_id === member.id);
   const approvedAchievements = memberAchievements.filter(a => a.status === 'approved');
   const pendingAchievements = memberAchievements.filter(a => a.status === 'pending');
   const rejectedAchievements = memberAchievements.filter(a => a.status === 'rejected');
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formTitle.trim() || !formYear || !formDecisionBy.trim()) return;
+    e.preventDefault(); // Chặn hành vi tải lại trang mặc định
 
-    setSubmittingForm(true);
+    // 1. Lấy ID của đảng viên hiện tại. 
+    const currentMemberId = member?.id;
+
+    if (!currentMemberId) {
+      alert('Không tìm thấy thông tin định danh của Đảng viên. Không thể gửi đề xuất!');
+      return;
+    }
+
+    // 2. Kiểm tra dữ liệu đầu vào cơ bản từ các state có sẵn của bạn
+    if (!formTitle.trim() || !formDecisionBy.trim()) {
+      alert('Vui lòng điền đầy đủ các thông tin có dấu sao đỏ (*)');
+      return;
+    }
+
     try {
-      await onSubmitAchievement({
-        member_id: member.id,
+      // 3. Đóng gói dữ liệu theo định dạng snake_case khớp cấu trúc bảng party_award_proposals
+      const proposalData: AwardProposalInput = {
+        member_id: currentMemberId,
         title: formTitle.trim(),
-        year: formYear,
+        year: Number(formYear) || 2026,
         decision_by: formDecisionBy.trim(),
-        notes: formNotes.trim(),
-      });
-      setShowAddForm(false);
-      setFormNotes('');
-    } finally {
-      setSubmittingForm(false);
+        // Nếu bạn có ô ghi chú/thành tích (thường quản lý bởi state formNotes hoặc tương đương), hãy truyền vào đây
+        notes: typeof formNotes !== 'undefined' ? formNotes.trim() : ''
+      };
+
+      // 4. Gọi hàm API gửi trực tiếp dữ liệu lên Supabase
+      await insertAwardProposal(proposalData);
+
+      alert('🚀 Gửi đề xuất khen thưởng tới Bí thư thành công!');
+
+      // 5. Reset các ô nhập liệu về trạng thái trống sau khi gửi thành công
+      setFormTitle('');
+      setFormDecisionBy('');
+      if (typeof setFormNotes === 'function') setFormNotes('');
+
+      // 6. Ẩn form nhập liệu đi sau khi gửi thành công (nếu bạn dùng state này để ẩn hiện form)
+      if (typeof setShowAddForm === 'function') setShowAddForm(false);
+
+    } catch (error: any) {
+      alert(`Đã xảy ra lỗi khi gửi đề xuất: ${error.message || error}`);
     }
   };
+
 
   const handleConfirmReject = async (achievementId: string) => {
     await onRejectAchievement(achievementId, rejectReason);
@@ -104,8 +156,10 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs font-interface overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 overflow-hidden my-6 flex flex-col max-h-[90vh]">
-        {/* Banner đỏ truyền thống quân đội & Tiêu đề trang trọng */}
+      <div className="bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden my-0 sm:my-6
+  w-full h-full fixed inset-0                           /* TRÊN ĐIỆN THOẠI: Tràn toàn bộ màn hình */
+  sm:w-[700px] sm:max-w-[90vw] sm:h-auto sm:max-h-[90vh] sm:relative sm:rounded-2xl /* TRÊN MÁY TÍNH: Co lại thành hộp thoại giữa màn hình */
+">        {/* Banner đỏ truyền thống quân đội & Tiêu đề trang trọng */}
         <div className="bg-gradient-to-r from-red-950 via-red-900 to-amber-950 text-white p-5 sm:p-6 relative shrink-0">
           <button
             onClick={onClose}
@@ -115,39 +169,19 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
           </button>
 
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-4">
-              {/* Ảnh đại diện tròn có viền vàng */}
-              <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-amber-400 text-red-950 flex items-center justify-center font-bold text-xl ring-4 ring-amber-300/40 shrink-0 shadow-lg select-none">
-                {member.full_name.slice(-2)}
-              </div>
+            {/* CHỈ GIỮ LẠI TÊN, QUÂN HÀM VÀ CHỨC VỤ THEO YÊU CẦU */}
+            <div className="flex flex-col gap-1.5 mt-2">
+              {/* 1. Họ và tên in đậm, kích thước lớn trang trọng */}
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-wide leading-snug">
+                {member.full_name}
+              </h2>
 
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded bg-amber-400/20 text-amber-200 border border-amber-400/30">
-                    {member.id.toUpperCase()}
-                  </span>
-                  <span
-                    className={`text-[11px] font-semibold px-2 py-0.5 rounded ${
-                      member.party_status === 'Chính thức'
-                        ? 'bg-red-800/80 text-amber-300 border border-amber-400/40'
-                        : 'bg-amber-800/80 text-white border border-amber-400/30'
-                    }`}
-                  >
-                    Đảng viên {member.party_status}
-                  </span>
-                </div>
-
-                <h2 className="text-lg sm:text-xl font-bold text-white mt-1 leading-snug">
-                  {member.full_name}
-                </h2>
-
-                <p className="text-xs text-red-200 mt-0.5 flex items-center gap-1.5">
-                  <span className="font-semibold text-amber-300">{member.military_rank}</span>
-                  <span>·</span>
-                  <span>{member.position}</span>
-                </p>
-              </div>
+              {/* 2. Quân hàm và Chức vụ ở ngay dòng dưới */}
+              <p className="text-amber-200/90 text-sm font-medium">
+                {member.military_rank} &middot; {member.position}
+              </p>
             </div>
+
 
             {/* Bộ chuyển đổi vai trò duyệt (Bí thư dv-01 vs Đảng viên) */}
             {onToggleSecretary && (
@@ -158,11 +192,10 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
                 <button
                   type="button"
                   onClick={onToggleSecretary}
-                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                    isSecretary
-                      ? 'bg-red-800 text-amber-300 shadow-xs'
-                      : 'bg-slate-800 text-slate-300 hover:text-white'
-                  }`}
+                  className={`px-2.5 py-1 rounded-lg font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${isSecretary
+                    ? 'bg-red-800 text-amber-300 shadow-xs'
+                    : 'bg-slate-800 text-slate-300 hover:text-white'
+                    }`}
                 >
                   <ShieldAlert className="w-3.5 h-3.5" />
                   <span>{isSecretary ? 'Bí thư Chi bộ (Có quyền duyệt)' : 'Đảng viên kê khai'}</span>
@@ -173,13 +206,26 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
 
           {/* Tab Navigation bên trong Modal */}
           <div className="flex items-center gap-1 mt-5 border-b border-red-800/60 pt-1 text-xs">
+
+            {/* Ô THỨ 1: LÝ LỊCH & THÔNG TIN CƠ BẢN (Được đưa lên đầu) */}
+            <button
+              onClick={() => setActiveTab('info')}
+              className={`px-3.5 py-2 font-semibold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${activeTab === 'info'
+                ? 'border-amber-400 text-amber-300 bg-red-900/40 rounded-t-lg'
+                : 'border-transparent text-red-200 hover:text-white'
+                }`}
+            >
+              <FileText className="w-4 h-4" />
+              <span>Lý lịch & Thông tin cơ bản</span>
+            </button>
+
+            {/* Ô THỨ 2: QUÁ TRÌNH KHEN THƯỞNG & DANH HIỆU (Đưa xuống thứ hai) */}
             <button
               onClick={() => setActiveTab('achievements')}
-              className={`px-3.5 py-2 font-semibold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'achievements'
-                  ? 'border-amber-400 text-amber-300 bg-red-900/40 rounded-t-lg'
-                  : 'border-transparent text-red-200 hover:text-white'
-              }`}
+              className={`px-3.5 py-2 font-semibold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${activeTab === 'achievements'
+                ? 'border-amber-400 text-amber-300 bg-red-900/40 rounded-t-lg'
+                : 'border-transparent text-red-200 hover:text-white'
+                }`}
             >
               <Award className="w-4 h-4" />
               <span>Quá trình Khen thưởng & Danh hiệu</span>
@@ -190,34 +236,13 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
               )}
             </button>
 
-            <button
-              onClick={() => setActiveTab('info')}
-              className={`px-3.5 py-2 font-semibold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'info'
-                  ? 'border-amber-400 text-amber-300 bg-red-900/40 rounded-t-lg'
-                  : 'border-transparent text-red-200 hover:text-white'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>Lý lịch & Thông tin cơ bản</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('evaluations')}
-              className={`px-3.5 py-2 font-semibold transition-all border-b-2 flex items-center gap-1.5 cursor-pointer ${
-                activeTab === 'evaluations'
-                  ? 'border-amber-400 text-amber-300 bg-red-900/40 rounded-t-lg'
-                  : 'border-transparent text-red-200 hover:text-white'
-              }`}
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>Lịch sử đánh giá hằng năm</span>
-            </button>
           </div>
+
         </div>
 
         {/* Nội dung Tab bên trong modal */}
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 custom-scrollbar space-y-5">
+
           {/* ================= TAB 1: KHEN THƯỞNG & LUỒNG PHÊ DUYỆT ================= */}
           {activeTab === 'achievements' && (
             <div className="space-y-6">
@@ -338,19 +363,21 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowAddForm(false)}
-                      className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg"
+                      className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-200 rounded-lg transition-colors"
                     >
                       Hủy bỏ
                     </button>
+
                     <button
                       type="submit"
                       disabled={submittingForm}
-                      className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-red-800 hover:bg-red-700 active:bg-red-900 rounded-lg shadow-xs transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-red-800 hover:bg-red-700 active:scale-95 transition-all rounded-lg disabled:bg-gray-400 disabled:scale-100"
                     >
                       <Send className="w-3.5 h-3.5 text-amber-300" />
                       <span>{submittingForm ? 'Đang gửi...' : 'Gửi Đề Xuất Tới Bí Thư'}</span>
                     </button>
                   </div>
+
                 </form>
               )}
 
@@ -454,10 +481,7 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
               <div className="space-y-3">
                 <div className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between">
                   <span>Danh Hiệu Chính Thức Trong Lý Lịch ({approvedAchievements.length})</span>
-                  <span className="text-[11px] text-slate-500 font-normal">
-                    Trích xuất theo thể thức Hướng dẫn 05-HD/VPTW
-                  </span>
-                </div>
+                  </div>
 
                 {approvedAchievements.length > 0 ? (
                   <div className="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-white">
@@ -534,83 +558,97 @@ export const MemberDetailModal: React.FC<MemberDetailModalProps> = ({
           {/* ================= TAB 2: THÔNG TIN CƠ BẢN (READ-ONLY) ================= */}
           {activeTab === 'info' && (
             <div className="space-y-5">
-              {/* Khối 1: Thông tin Quân sự & Đảng */}
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+              {/* Khối gộp liền mạch: Thông tin trích ngang đảng viên & Địa bàn cơ động (SSCĐ) */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+
+                {/* Tiêu đề khối chung duy nhất */}
+                <div className="flex items-center gap-1.5 border-b border-slate-200 pb-2.5 mb-4">
                   <Shield className="w-4 h-4 text-red-800" />
-                  1. Thông Tin Quân Sự & Tổ Chức Đảng
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                    Thông tin trích ngang đảng viên
+                  </h3>
+                </div>
+
+                {/* Lưới hiển thị dữ liệu liền mạch */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+
+                  {/* Mã Đảng viên */}
                   <div>
                     <span className="text-slate-500">Mã Đảng viên:</span>
-                    <div className="font-mono font-bold text-slate-900 mt-0.5 text-sm">{member.id.toUpperCase()}</div>
+                    <div className="font-mono font-bold text-slate-900 mt-0.5 text-sm">
+                      {member.id?.toUpperCase()}
+                    </div>
                   </div>
+
+                  {/* Năm sinh */}
                   <div>
-                    <span className="text-slate-500">Ngày sinh:</span>
-                    <div className="font-semibold text-slate-800 mt-0.5 font-document text-[14px]">{member.birth_year}</div>
+                    <span className="text-slate-500">Năm sinh:</span>
+                    <div className="font-semibold text-slate-800 mt-0.5 text-[14px]">
+                      {member.birth_year}
+                    </div>
                   </div>
+
+                  {/* Số thẻ CCCD */}
                   <div>
                     <span className="text-slate-500">Số thẻ CCCD:</span>
-                    <div className="font-mono text-slate-800 mt-0.5 font-semibold text-[13px] tabular-nums">{member.citizen_id}</div>
+                    <div className="font-mono text-slate-800 mt-0.5 font-semibold text-[13px] tabular-nums">
+                      {member.citizen_id}
+                    </div>
                   </div>
+
+                  {/* Thời gian nhập ngũ */}
                   <div>
-                    <span className="text-slate-500">Thời gian nhập ngũ:</span>
-                    <div className="font-semibold text-slate-800 mt-0.5 font-document text-[14px]">{member.enlistment_date}</div>
+                    <span className="text-slate-500">Nhập ngũ:</span>
+                    <div className="font-semibold text-slate-800 mt-0.5 text-[14px]">
+                      {member.enlistment_date}
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-slate-500">Ngày vào Đảng CSVN:</span>
-                    <div className="font-semibold text-slate-800 mt-0.5 font-document text-[14px]">
+
+                  {/* Ngày vào Đảng CSVN - Cho chiếm 2 cột để bù khoảng trống ô bị xóa */}
+                  <div className="col-span-2">
+                    <span className="text-slate-500">Ngày vào Đảng:</span>
+                    <div className="font-semibold text-slate-800 mt-0.5 text-[14px]">
                       {member.party_join_date}
                     </div>
                   </div>
-                  <div>
-                    <span className="text-slate-500">Ngày chính thức:</span>
-                    <div className="font-semibold text-slate-800 mt-0.5 font-document text-[14px]">
-                      {member.official_party_date || 'Chưa công nhận'}
-                    </div>
-                  </div>
-                  <div className="col-span-2 sm:col-span-3 pt-2 border-t border-slate-200">
-                    <span className="text-slate-500">Chức vụ trong Chi bộ / Cơ quan:</span>
-                    <div className="font-semibold text-slate-900 mt-0.5 text-sm">{member.position}</div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Khối 2: Nơi ở, Quê quán & Sẵn sàng cơ động */}
-              <div>
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <MapPin className="w-4 h-4 text-red-800" />
-                  2. Địa Bàn Cư Trú & Sẵn Sàng Cơ Động (SSCĐ)
-                </h3>
-                <div className="space-y-2.5 text-xs bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <span className="text-slate-500">Nơi ở hiện nay:</span>
-                      <div className="font-semibold text-slate-800 mt-0.5 text-[13.5px] font-document">{member.current_residence}</div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-slate-500">Cự ly cơ động về Ban CHQS TP:</span>
-                      <div className="font-bold text-red-900 text-sm tabular-nums mt-0.5">{member.distance_km} km</div>
+                  {/* Chức vụ - Kéo dài hết hàng để ngắt nhịp tinh tế sang phần Địa bàn */}
+                  <div className="col-span-2 sm:col-span-3 border-b border-slate-200 pb-3 mt-1">
+                    <span className="text-slate-500">Chức vụ:</span>
+                    <div className="font-semibold text-slate-800 mt-0.5 text-[14px]">
+                      {member.position || 'Trợ lý'}
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-slate-200">
+                  {/* Quê quán */}
+                  <div className="col-span-2 sm:col-span-3 mt-1">
                     <span className="text-slate-500">Quê quán:</span>
-                    <div className="font-semibold text-slate-800 mt-0.5 font-document text-[13.5px]">{member.hometown}</div>
+                    <div className="font-semibold text-slate-800 mt-0.5 text-[14px]">
+                      {member.hometown}
+                    </div>
+
+                    {/* Nơi ở hiện nay */}
+                    <div className="col-span-2">
+                      <span className="text-slate-500">Nơi ở hiện nay:</span>
+                      <div className="font-semibold text-slate-800 mt-0.5 text-[14px] leading-relaxed">
+                        {member.current_residence}
+                      </div>
+                    </div>
+
+                    {/* Cự ly cơ động về Ban CHQS TP */}
+                    <div className="bg-red-50/60 p-2 rounded-lg border border-red-100 flex flex-row sm:flex-col justify-between items-center sm:justify-center sm:text-right col-span-2 sm:col-span-1">
+                      <span className="text-slate-500 text-[11px] sm:mb-0.5">Cự ly đến cơ quan:</span>
+                      <span className="font-bold text-red-600 text-sm sm:text-base">
+                        {member.distance_km || '0'} km
+                      </span>
+                    </div>
+
+
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-                    <div>
-                      <span className="text-slate-500">Điện thoại liên lạc cá nhân:</span>
-                      <div className="font-mono text-slate-900 mt-0.5 font-bold text-sm tabular-nums">{member.phone}</div>
-                    </div>
-                    <div>
-                      <span className="text-slate-500">Khi cần báo tin khẩn cấp:</span>
-                      <div className="font-semibold text-slate-800 mt-0.5">{member.emergency_contact}</div>
-                    </div>
-                  </div>
                 </div>
               </div>
+
 
               {/* Ghi chú đặc thù */}
               {member.notes && (

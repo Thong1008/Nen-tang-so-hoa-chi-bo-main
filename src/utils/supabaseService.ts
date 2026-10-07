@@ -271,3 +271,118 @@ export async function pushAllToCloud(members: PartyMember[]): Promise<{ success:
     return { success: false, message: `Lỗi kết nối khi đồng bộ: ${err?.message || 'Không có tín hiệu mạng'}` };
   }
 }
+// Thêm interface định nghĩa kiểu dữ liệu chặt chẽ cho TypeScript ở cuối file src/utils/supabaseService.ts
+export interface AwardProposalInput {
+    member_id: string;
+    title: string;              
+    year: number;              
+    decision_by: string;       
+    notes: string;
+}
+
+/**
+ * Hàm thực hiện chèn dữ liệu đề xuất khen thưởng mới vào bảng party_award_proposals
+ * @param proposal Đối tượng chứa thông tin form kê khai của đảng viên
+ */
+export const insertAwardProposal = async (proposal: AwardProposalInput): Promise<any[]> => {
+  // Thực hiện insert dữ liệu dạng snake_case khớp hoàn toàn với cấu trúc bảng trong Supabase
+  const { data, error } = await supabase
+    .from('party_award_proposals')
+    .insert([
+      {
+        member_id: proposal.member_id,
+        title: proposal.title,
+        year: proposal.year,
+        decision_by: proposal.decision_by,
+        notes: proposal.notes,
+        status: 'Chờ duyệt' // Cố định trạng thái đơn khi vừa gửi lên hệ thống
+      }
+    ])
+    .select();
+
+  // Kiểm tra nếu Supabase trả về lỗi, throw ra ngoài để component catch được và hiện thông báo công khai
+  if (error) {
+    console.error('Database Insertion Error:', error.message);
+    throw new Error(error.message);
+  }
+
+  return data || [];
+};
+// Dán đoạn này vào CUỐI file src/utils/supabaseService.ts
+export const getPartyAwards = async (memberId: string): Promise<any[]> => {
+  const { data, error } = await supabase
+    .from('party_awards')
+    .select('*')
+    .eq('member_id', memberId)
+    .order('year', { ascending: false }); // Sắp xếp theo năm mới nhất
+
+  if (error) {
+    console.error('Lỗi khi lấy danh sách party_awards:', error.message);
+    throw new Error(error.message);
+  }
+
+  return data || [];
+};
+
+export const approveAwardProposal = async (proposalId: number, proposal: any): Promise<boolean> => {
+  try {
+    if (!proposalId) return false;
+
+    // 1. Cập nhật trạng thái đơn đề xuất trong bảng party_award_proposals thành 'Đã duyệt'
+    // Sử dụng câu lệnh cập nhật trực tiếp theo ID giống hàm gốc để không bao giờ bị lỗi đọc dữ liệu RLS hay lệch chuỗi tiếng Việt
+    const { error: updateError } = await supabase
+      .from('party_award_proposals')
+      .update({ status: 'Đã duyệt' })
+      .eq('id', proposalId);
+
+    if (updateError) {
+      console.error('Lỗi khi cập nhật trạng thái đơn đề xuất:', updateError.message);
+      throw new Error(updateError.message);
+    }
+
+    // 2. Sao chép thông tin và chèn mới vào bảng ghi lịch sử chính thức party_awards
+    const { error: insertError } = await supabase
+      .from('party_awards')
+      .insert([
+        {
+          member_id: proposal.member_id,
+          title: proposal.title,              
+          year: Number(proposal.award_year) || new Date().getFullYear(),        
+          decision_by: proposal.decision_by || 'Trung đoàn 6',     
+          notes: proposal.notes || '', 
+          status: 'approved'                        
+        }
+      ]);
+
+    if (insertError) {
+      console.error('Lỗi khi đồng bộ dữ liệu lịch sử sang bảng party_awards:', insertError.message);
+      throw new Error(insertError.message);
+    }
+
+    // Trả về true để kích hoạt logic xóa đơn lập tức biến mất trên cả giao diện Web và Mobile của bạn
+    return true;
+
+  } catch (error: any) {
+    console.error('Quá trình phê duyệt đơn đề xuất thất bại toàn cục:', error.message);
+    throw error;
+  }
+};
+
+
+/**
+ * Hàm xử lý Từ chối đề xuất khen thưởng (Không sao chép dữ liệu, chỉ chuyển trạng thái đơn)
+ * @param proposalId ID khóa chính của đơn trong bảng party_award_proposals
+ */
+export const rejectAwardProposal = async (proposalId: number): Promise<boolean> => {
+  const { error } = await supabase
+    .from('party_award_proposals')
+    .update({ status: 'Từ chối' })
+    .eq('id', proposalId);
+
+  if (error) {
+    console.error('Lỗi khi từ chối đơn đề xuất:', error.message);
+    throw new Error(error.message);
+  }
+
+  return true;
+};

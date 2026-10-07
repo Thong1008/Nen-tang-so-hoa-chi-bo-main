@@ -93,54 +93,10 @@ export const MemberCardView: React.FC<MemberCardViewProps> = ({
           )}
         </div>
 
-        {/* Filter Segmented Control */}
-        <div className="grid grid-cols-3 gap-1 bg-slate-100 p-0.5 rounded-lg text-xs">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`py-1.5 rounded-md font-medium text-center transition-all ${
-              statusFilter === 'all'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Tất cả ({members.length})
-          </button>
-          <button
-            onClick={() => setStatusFilter('Chính thức')}
-            className={`py-1.5 rounded-md font-medium text-center transition-all ${
-              statusFilter === 'Chính thức'
-                ? 'bg-red-800 text-white shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-red-800'
-            }`}
-          >
-            Chính thức
-          </button>
-          <button
-            onClick={() => setStatusFilter('Dự bị')}
-            className={`py-1.5 rounded-md font-medium text-center transition-all ${
-              statusFilter === 'Dự bị'
-                ? 'bg-amber-600 text-white shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-amber-800'
-            }`}
-          >
-            Dự bị
-          </button>
-        </div>
       </div>
 
       {/* Banner thông báo nếu có khen thưởng chờ duyệt */}
-      {totalPending > 0 && (
-        <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-xl text-xs flex items-center justify-between text-amber-950 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-            <span>
-              Có <strong>{totalPending}</strong> đề xuất khen thưởng đang chờ phê duyệt.
-            </span>
-          </div>
-          <span className="text-[10px] text-amber-800 font-bold underline">Xem chi tiết</span>
-        </div>
-      )}
-
+     
       {/* Subtext info */}
       <div className="flex items-center justify-between text-[11px] text-slate-500 px-1">
         <span>Hiển thị {filteredMembers.length} / {members.length} đồng chí</span>
@@ -169,16 +125,7 @@ export const MemberCardView: React.FC<MemberCardViewProps> = ({
                 <div className="flex items-start justify-between gap-3">
                   {/* Left: Avatar + Details */}
                   <div className="flex items-start gap-3 min-w-0 flex-1">
-                    <div
-                      className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm shrink-0 shadow-xs ring-2 ${
-                        isSenior
-                          ? 'bg-red-800 text-amber-300 ring-amber-400/60'
-                          : 'bg-slate-800 text-slate-100 ring-slate-300/40'
-                      }`}
-                    >
-                      {member.full_name.slice(-2)}
-                    </div>
-
+                    
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
@@ -211,7 +158,7 @@ export const MemberCardView: React.FC<MemberCardViewProps> = ({
                       <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1.5 flex-wrap">
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3 h-3 text-red-700" />
-                          <strong className="text-slate-800">{member.distance_km} km</strong> (Ban CHQS)
+                          <strong className="text-slate-800">{member.distance_km} km</strong> (Cự li đến cơ quan)
                         </span>
 
                         <span className="flex items-center gap-1">
@@ -238,7 +185,7 @@ export const MemberCardView: React.FC<MemberCardViewProps> = ({
 
                         {(!achInfo || (achInfo.approved === 0 && achInfo.pending === 0)) && (
                           <span className="text-[10.5px] text-slate-400 italic">
-                            Chưa có danh hiệu
+                             
                           </span>
                         )}
                       </div>

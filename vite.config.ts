@@ -16,5 +16,5 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
     },
-  }; // <-- ĐÃ VÁ LỖI THIẾU DẤU ĐÓNG NGOẶC } VÀ DẤU ; Ở ĐÂY
+  }; 
 });

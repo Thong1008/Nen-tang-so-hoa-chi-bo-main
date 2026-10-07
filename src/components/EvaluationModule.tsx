@@ -40,6 +40,8 @@ import {
 
 interface EvaluationModuleProps {
   members: PartyMember[];
+  currentUser: any
+  isAdmin: boolean;
 }
 
 export const EvaluationModule: React.FC<EvaluationModuleProps> = ({ members }) => {

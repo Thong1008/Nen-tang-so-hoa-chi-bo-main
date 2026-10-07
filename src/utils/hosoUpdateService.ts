@@ -28,7 +28,7 @@ export const INITIAL_HOSO_UPDATES: HosoUpdateRecord[] = [
         new_value: 'Trung cấp Lý luận Chính trị',
       },
     ],
-    trang_thai: 'pending',
+    trang_thai: 'Chờ duyệt',
     requested_at: '2026-09-28 14:30',
   },
   {
@@ -58,7 +58,7 @@ export const INITIAL_HOSO_UPDATES: HosoUpdateRecord[] = [
         new_value: '1.8',
       },
     ],
-    trang_thai: 'pending',
+    trang_thai: 'Chờ duyệt',
     requested_at: '2026-09-29 09:15',
   },
 ];
@@ -158,7 +158,7 @@ export async function submitHosoUpdateRequest(
     field_category: fieldCategory,
     category_label: categoryLabel,
     changes,
-    trang_thai: 'pending',
+    trang_thai: 'Chờ duyệt',
     requested_at: dateStr,
   };
 
@@ -176,7 +176,7 @@ export async function submitHosoUpdateRequest(
         field_category: newRecord.field_category,
         category_label: newRecord.category_label,
         changes: JSON.stringify(newRecord.changes),
-        trang_thai: 'pending',
+        trang_thai: 'Chờ duyệt',
         requested_at: newRecord.requested_at,
       },
     ]);
@@ -223,7 +223,7 @@ export async function approveHosoUpdateRequest(
 
   const updatedRecord: HosoUpdateRecord = {
     ...targetUpdate,
-    trang_thai: 'approved',
+    trang_thai: 'Đã duyệt',
     reviewed_by: reviewerName || 'Đ/c Nguyễn Anh Toàn - Bí thư Chi bộ',
     reviewed_at: reviewedAtStr,
   };
@@ -259,13 +259,13 @@ export async function approveHosoUpdateRequest(
     await supabase
       .from('hoso_updates')
       .update({
-        trang_thai: 'approved',
+        trang_thai: 'Đã duyệt',
         reviewed_by: updatedRecord.reviewed_by,
         reviewed_at: updatedRecord.reviewed_at,
       })
       .eq('id', updateId);
-  } catch {
-    // Fallback local
+  } catch (error) {
+    console.error("Lỗi cập nhật Supabase fallback local:", error);
   }
 
   return {
@@ -304,7 +304,7 @@ export async function rejectHosoUpdateRequest(
 
   const updatedRecord: HosoUpdateRecord = {
     ...targetUpdate,
-    trang_thai: 'rejected',
+    trang_thai: 'Từ chối',
     reviewed_by: reviewerName || 'Đ/c Nguyễn Anh Toàn - Bí thư Chi bộ',
     reviewed_at: reviewedAtStr,
     review_note: reason || 'Chưa cung cấp đủ giấy tờ / minh chứng hợp lệ',

@@ -32,10 +32,13 @@ export const HosoApprovalModal: React.FC<HosoApprovalModalProps> = ({
   const [rejectReason, setRejectReason] = useState<string>('');
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  if (!isOpen) return null;
+   // SỬA CHUẨN: Dùng thuộc tính status gốc của đối tượng, không cần ép kiểu :any
+const pendingList = hosoUpdates.filter((u) => u.trang_thai === 'Chờ duyệt');
+const processedList = hosoUpdates.filter((u) => u.trang_thai !== 'Chờ duyệt');
 
-  const pendingList = hosoUpdates.filter((u) => u.trang_thai === 'pending');
-  const processedList = hosoUpdates.filter((u) => u.trang_thai !== 'pending');
+
+
+
 
   const handleConfirmApprove = async (id: string) => {
     setProcessingId(id);
@@ -229,7 +232,7 @@ export const HosoApprovalModal: React.FC<HosoApprovalModalProps> = ({
                       </div>
                     </div>
                     <div>
-                      {p.trang_thai === 'approved' ? (
+                      {p.trang_thai === 'Đã duyệt' ? (
                         <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold text-[10.5px]">
                           Đã duyệt
                         </span>

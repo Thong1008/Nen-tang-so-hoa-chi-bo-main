@@ -26,3 +26,25 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     fetch: fetchWithTimeout,
   },
 });
+/**
+ * 🏛️ HÀM ĐƯỜNG DÀI: Kiểm tra hạ tầng thông mạng đám mây Supabase
+ * Tự động ping trực tiếp tới REST Endpoint để xác định trạng thái kết nối thực tế.
+ */
+export const checkCloudConnection = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+      method: 'GET',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+      },
+    });
+
+    // Nếu Cloud phản hồi (kể cả phản hồi lỗi phân quyền 401 hoặc thành công), 
+    // chứng tỏ đường truyền từ máy tính tới máy chủ Supabase hoàn toàn thông suốt.
+    return response.status === 200 || response.status === 204 || response.status === 401;
+  } catch (error) {
+    // Nếu rơi vào đây, chứng tỏ lỗi kết nối mạng thật sự (mất mạng, Firewall chặn cứng)
+    console.error("❌ Hệ thống mất kết nối vật lý tới đám mây Supabase:", error);
+    return false;
+  }
+};

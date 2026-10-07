@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { PartyMember, PartyStatus } from '../types/partyMember';
 import { MILITARY_RANKS, POSITIONS } from '../utils/mockData';
 import { X, UserPlus, Save, AlertCircle } from 'lucide-react';
+// Chèn vào dưới dòng import số 4 của bạn
+import { insertAwardProposal, AwardProposalInput } from '../utils/supabaseService';
 
 interface MemberModalProps {
   isOpen: boolean;
@@ -37,7 +39,47 @@ export const MemberModal: React.FC<MemberModalProps> = ({
     distance_km: 2.0,
     notes: '',
   });
+  const [awardType, setAwardType] = useState<string>('Chiến sĩ thi đua cơ sở');
+  const [awardYear, setAwardYear] = useState<number>(2025);
+  const [decisionLevel, setDecisionLevel] = useState<string>('Bộ Chỉ huy Quân sự Tỉnh Thừa Thiên Huế');
+  const [summaryAchievement, setSummaryAchievement] = useState<string>('');
+  const [isSubmittingProposal, setIsSubmittingProposal] = useState<boolean>(false);
 
+  const handleSendProposal = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+
+    const currentMemberId = initialMember?.id;
+    if (!currentMemberId) {
+      alert('Không tìm thấy thông tin định danh của Đảng viên. Vui lòng thử lại!');
+      return;
+    }
+
+    if (!awardType.trim() || !decisionLevel.trim()) {
+      alert('Vui lòng hoàn thành đầy đủ các thông tin có đánh dấu dấu sao đỏ (*)');
+      return;
+    }
+
+    setIsSubmittingProposal(true);
+
+    try {
+      const proposalData = {
+        member_id: currentMemberId,
+        title: awardType.trim(),
+        year: Number(awardYear),
+        decision_by: decisionLevel.trim(),
+        notes: summaryAchievement.trim()
+      };
+
+      await insertAwardProposal(proposalData);
+      alert(`Đã gửi thành công đề xuất danh hiệu của đồng chí ${formData.full_name || 'Đảng viên'} tới Bí thư Chi bộ!`);
+      setSummaryAchievement('');
+
+    } catch (error: any) {
+      alert(`Gửi đề xuất thất bại: ${error.message || 'Lỗi hệ thống không xác định'}`);
+    } finally {
+      setIsSubmittingProposal(false);
+    }
+  };
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -166,9 +208,8 @@ export const MemberModal: React.FC<MemberModalProps> = ({
                 value={formData.full_name || ''}
                 onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                 placeholder="VD: Nguyễn Văn Thông"
-                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 ${
-                  errors.full_name ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 ${errors.full_name ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.full_name && (
                 <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
@@ -186,9 +227,8 @@ export const MemberModal: React.FC<MemberModalProps> = ({
                 value={formData.birth_year || ''}
                 onChange={(e) => setFormData({ ...formData, birth_year: e.target.value })}
                 placeholder="VD: 10/08/1999"
-                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 ${
-                  errors.birth_year ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 ${errors.birth_year ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.birth_year && (
                 <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
@@ -210,9 +250,8 @@ export const MemberModal: React.FC<MemberModalProps> = ({
                 value={formData.citizen_id || ''}
                 onChange={(e) => setFormData({ ...formData, citizen_id: e.target.value })}
                 placeholder="VD: 046199009873"
-                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 font-mono ${
-                  errors.citizen_id ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 font-mono ${errors.citizen_id ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.citizen_id && (
                 <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
@@ -282,9 +321,8 @@ export const MemberModal: React.FC<MemberModalProps> = ({
                 value={formData.party_join_date || ''}
                 onChange={(e) => setFormData({ ...formData, party_join_date: e.target.value })}
                 placeholder="VD: 19/05/2021"
-                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 ${
-                  errors.party_join_date ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 ${errors.party_join_date ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.party_join_date && (
                 <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
@@ -335,9 +373,8 @@ export const MemberModal: React.FC<MemberModalProps> = ({
                 value={formData.phone || ''}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 placeholder="VD: 0935.667.891"
-                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 font-mono ${
-                  errors.phone ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 font-mono ${errors.phone ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.phone && (
                 <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">
@@ -384,9 +421,8 @@ export const MemberModal: React.FC<MemberModalProps> = ({
                 value={formData.current_residence || ''}
                 onChange={(e) => setFormData({ ...formData, current_residence: e.target.value })}
                 placeholder="VD: Đường Lê Huân, P. Thuận Hòa, TP Huế"
-                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 ${
-                  errors.current_residence ? 'border-red-500' : 'border-slate-300'
-                }`}
+                className={`w-full px-3.5 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600 focus:bg-white text-slate-900 ${errors.current_residence ? 'border-red-500' : 'border-slate-300'
+                  }`}
               />
               {errors.current_residence && (
                 <p className="text-[11px] text-red-600 mt-1 flex items-center gap-1">

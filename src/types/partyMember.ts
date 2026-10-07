@@ -10,7 +10,7 @@ export type MilitaryRankType =
   | 'Trung úy'
   | 'Thiếu úy'
   | 'Thượng tá QNCN'
-  | 'Trung tá QNCN'
+  | 'Trung tá QNCN' 
   | 'Thiếu tá QNCN'
   | 'Đại úy QNCN'
   | 'Thượng úy QNCN'

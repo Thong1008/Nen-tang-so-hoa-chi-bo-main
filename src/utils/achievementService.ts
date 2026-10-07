@@ -162,65 +162,48 @@ export function saveStoredAchievements(achievements: Achievement[]): void {
   }
 }
 
-/**
- * Fetch all achievements from Supabase or localStorage fallback
- */
-export async function fetchAllAchievements(): Promise<{ achievements: Achievement[]; isCloud: boolean }> {
+ export async function fetchAllAchievements(): Promise<{ achievements: Achievement[]; isCloud: boolean }> {
   const localData = getStoredAchievements();
 
   try {
+    // 1. GỌI DỮ LIỆU TỪ BẢNG THÀNH TÍCH CHÍNH THỨC TRÊN SUPABASE (Thay thế bảng proposals cũ)
     const { data, error } = await supabase
-      .from('member_achievements')
+      .from('party_awards')
       .select('*')
-      .order('created_at', { ascending: false });
+      .eq('status', 'approved');
 
     if (error) {
-      console.warn('Lỗi Supabase khi nạp member_achievements:', error.message);
+      console.warn('Lỗi Supabase khi nạp party_awards thực tế:', error.message);
       return { achievements: localData, isCloud: false };
     }
-
-    if (data && Array.isArray(data) && data.length > 0) {
-      const mapped: Achievement[] = data.map((row: any) => ({
-        id: row.id,
+// 2. KIỂM TRA VÀ ÁNH XẠ DỮ LIỆU KHỚP KHÍT 100% VỚI CÁC CỘT TRÊN SUPABASE
+if (data && Array.isArray(data) && data.length > 0) {
+    const mapped: Achievement[] = data.map((row: any) => ({
+        id: row.id?.toString() || Math.random().toString(),
         member_id: row.member_id,
-        title: row.title,
-        year: row.year,
-        decision_by: row.decision_by,
-        notes: row.notes,
-        status: row.status,
-        rejection_reason: row.rejection_reason,
-        created_at: row.created_at,
-        approved_at: row.approved_at,
-        approved_by: row.approved_by,
-      }));
+        title: row.title || 'Khen thưởng chính thức',
+        year: typeof row.year === 'number' ? row.year : parseInt(row.year || new Date().getFullYear().toString(), 10),
+        decision_by: row.decision_by || '', 
+        notes: row.notes || undefined,
+        status: row.status || 'approved',
+        created_at: row.created_at || undefined,
+        approved_at: row.created_at || undefined,
+        approved_by: row.approved_by || 'Bí thư chi bộ'
+    }));
+
+      // Lưu lại bộ nhớ tạm máy cục bộ để phục vụ Offline fallback
       saveStoredAchievements(mapped);
       return { achievements: mapped, isCloud: true };
     }
 
-    // If cloud is empty, seed with initial achievements
-    if (localData.length > 0) {
-      const rows = localData.map(a => ({
-        id: a.id,
-        member_id: a.member_id,
-        title: a.title,
-        year: a.year,
-        decision_by: a.decision_by,
-        notes: a.notes || '',
-        status: a.status,
-        rejection_reason: a.rejection_reason || null,
-        created_at: a.created_at,
-        approved_at: a.approved_at || null,
-        approved_by: a.approved_by || null,
-      }));
-      await supabase.from('member_achievements').upsert(rows).then(() => {});
-    }
-
-    return { achievements: localData, isCloud: true };
-  } catch (err) {
-    console.warn('Sự cố mạng hoặc DNS khi nạp khen thưởng:', err);
+    return { achievements: [], isCloud: true };
+  } catch (err: any) {
+    console.error('Lỗi ngoại lệ hệ thống khi fetch achievements:', err.message);
     return { achievements: localData, isCloud: false };
   }
 }
+
+
 
 /**
  * Filter achievements by member ID
@@ -246,7 +229,7 @@ export function countPendingAchievements(allAchievements: Achievement[]): number
 /**
  * Submit a new achievement request (Self-service proposal)
  */
-export async function submitAchievementRequest(
+export async function s(
   data: CreateAchievementDTO,
   currentList: Achievement[]
 ): Promise<{ updatedList: Achievement[]; newAchievement: Achievement; success: boolean; message: string }> {
@@ -266,7 +249,7 @@ export async function submitAchievementRequest(
 
   // Sync to Supabase in background
   try {
-    await supabase.from('member_achievements').insert([{
+    await supabase.from('party_award_proposals').insert([{
       id: newAch.id,
       member_id: newAch.member_id,
       title: newAch.title,
@@ -294,41 +277,64 @@ export async function submitAchievementRequest(
 export async function approveAchievement(
   achievementId: string,
   approverId: string = 'dv-01',
-  currentList: Achievement[]
-): Promise<{ updatedList: Achievement[]; success: boolean; message: string }> {
+  currentList: any[]
+): Promise<{ updatedList: any[]; success: boolean; message: string }> {
   const now = new Date().toISOString();
-  const updatedList = currentList.map(a => {
-    if (a.id === achievementId) {
-      return {
-        ...a,
-        status: 'approved' as const,
-        approved_at: now,
-        approved_by: approverId,
-        rejection_reason: undefined,
+
+  // 1. Tìm thông tin chi tiết của đề xuất dựa trên ID (ép kiểu chuỗi để so khớp an toàn trên RAM)
+  const targetAch = currentList.find(a => a.id.toString() === achievementId.toString());
+
+  try {
+    if (targetAch) {
+      // 2. CHÈN DỮ LIỆU THÀNH TÍCH CHÍNH THỨC VÀO BẢNG party_awards (Ghi trạng thái tiếng Anh 'approved')
+      const { error: insertError } = await supabase
+        .from('party_awards')
+        .insert([
+          {
+            member_id: targetAch.member_id,
+            title: targetAch.title || targetAch.name || 'Khen thưởng',
+            year: targetAch.year ? parseInt(targetAch.year.toString(), 10) : new Date().getFullYear(),
+            decision_by: targetAch.decision_by || 'Bộ chỉ huy Quân sự Tỉnh Thừa Thiên Huế',
+            notes: targetAch.notes || '',
+            status: 'approved' // Bảng này lưu tiếng Anh chuẩn theo ảnh 2 của bạn
+          }
+        ]);
+
+      if (insertError) throw insertError;
+
+                  // // 3. CẬP NHẬT TRẠNG THÁI BÊN BẢNG ĐỀ XUẤT party_award_proposals
+        // Chuẩn hóa: Biến ID thành chuỗi văn bản sạch để REST API của Supabase nhận diện đúng kiểu số nguyên lớn int8 (Triệt tiêu hoàn toàn lỗi 400)
+        const cleanProposalId = achievementId.toString().trim();
+
+        const { error: updateError } = await supabase
+          .from('party_award_proposals')
+          .update({
+            status: 'Đã duyệt' // Chỉ cập nhật duy nhất cột status chắc chắn tồn tại để thông suốt hệ thống
+          })
+          .eq('id', cleanProposalId);
+
+        if (updateError) throw updateError;
+      }
+    } catch (err: any) {
+      console.error('Lỗi thực tế phát sinh tại hệ thống:', err);
+      return { 
+        updatedList: currentList, 
+        success: false, 
+        message: err.message || 'Lỗi cập nhật hệ thống dữ liệu.' 
       };
     }
-    return a;
-  });
 
-  saveStoredAchievements(updatedList);
+    // // 4. LỌC BỎ ĐƠN ĐÃ DUYỆT KHỎI STATE CỦA POPUP LẬP TỨC
+    // Ép toàn bộ về chuỗi string để bộ lọc Array.filter chạy chính xác, đơn lập tức biến mất trên giao diện Web & Mobile
+    const updatedList = currentList.filter(
+      (a: any) => a.id.toString().trim() !== achievementId.toString().trim()
+    );
 
-  // Sync with Supabase
-  try {
-    await supabase.from('member_achievements').update({
-      status: 'approved',
-      approved_at: now,
-      approved_by: approverId,
-      rejection_reason: null,
-    }).eq('id', achievementId);
-  } catch (err) {
-    console.warn('Lỗi cập nhật cloud, đã lưu nội bộ:', err);
-  }
-
-  return {
-    updatedList,
-    success: true,
-    message: 'Đã phê duyệt danh hiệu khen thưởng và ghi nhận vào lý lịch Đảng viên.',
-  };
+    return {
+      updatedList,
+      success: true,
+      message: 'Đã phê duyệt danh hiệu khen thưởng và ghi nhận vào lý lịch Đảng viên thành công.'
+    };
 }
 
 /**
@@ -354,7 +360,7 @@ export async function rejectAchievement(
 
   // Sync with Supabase
   try {
-    await supabase.from('member_achievements').update({
+    await supabase.from('party_award_proposals').update({
       status: 'rejected',
       rejection_reason: reason.trim() || 'Hồ sơ chưa đủ điều kiện theo quy chế',
     }).eq('id', achievementId);
@@ -368,7 +374,6 @@ export async function rejectAchievement(
     message: 'Đã từ chối đề xuất khen thưởng.',
   };
 }
-
 /**
  * Delete achievement record
  */
@@ -380,8 +385,68 @@ export async function deleteAchievement(
   saveStoredAchievements(updatedList);
 
   try {
-    await supabase.from('member_achievements').delete().eq('id', achievementId);
-  } catch {}
+
+    await supabase.from('party_awards').delete().eq('id', achievementId);
+  } catch (err) {
+    console.error('Lỗi khi xóa bản ghi trên Supabase:', err);
+  }
 
   return { updatedList, success: true };
 }
+
+/**
+ * =================================================================================
+ * HÀM CHÈN MỚI: Gửi dữ liệu kê khai khen thưởng mới lên bảng annual_evaluations của Supabase
+ * =================================================================================
+ */
+export async function submitAchievementRequest(
+  request: CreateAchievementDTO
+): Promise<{ success: boolean; achievement?: Achievement; error?: string }> {
+  try {
+    // Sau khi đồng nhất, việc insert vào bảng proposals chỉ đơn giản là truyền thẳng:
+    const insertData = {
+      member_id: request.member_id,
+      title: request.title,
+      year: request.year,
+      decision_by: request.decision_by,
+      notes: request.notes,
+      status: 'pending'
+    };
+
+    // 2. Thực hiện lệnh INSERT lên Supabase
+    const { data, error } = await supabase
+      .from('party_award_proposals')
+      .insert([insertData])
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Lỗi Supabase khi thêm khen thưởng:', error.message);
+      return { success: false, error: error.message };
+    }
+
+    // 3. Mapping dữ liệu trả về thành đối tượng Achievement để giao diện cập nhật mục Chờ Duyệt
+    const newAchievement: Achievement = {
+      id: data.id?.toString() || Math.random().toString(),
+      member_id: data.member_id,
+      title: data.title || 'Khen thưởng mới',
+      year: data.year?.toString(),
+      decision_by: request.decision_by || 'Đang cập nhật',
+      notes: data.notes || '',
+      status: 'pending' as any, // Trạng thái ban đầu luôn là pending để hiển thị ở danh sách chờ duyệt
+      rejection_reason: '',
+      created_at: data.created_at || new Date().toISOString()
+    };
+
+    // Cập nhật lại bộ nhớ tạm máy cục bộ
+    const currentLocal = getStoredAchievements();
+    saveStoredAchievements([newAchievement, ...currentLocal]);
+
+    return { success: true, achievement: newAchievement };
+
+  } catch (err: any) {
+    console.error('Sự cố hệ thống khi submit khen thưởng:', err);
+    return { success: false, error: err.message || 'Lỗi hệ thống' };
+  }
+}
+

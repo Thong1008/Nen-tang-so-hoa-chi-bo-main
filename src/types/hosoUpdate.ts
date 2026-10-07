@@ -1,6 +1,6 @@
 export type HosoUpdateFieldCategory = 'education' | 'achievement' | 'discipline' | 'contact';
 
-export type HosoUpdateStatus = 'pending' | 'approved' | 'rejected';
+export type HosoUpdateStatus = 'Chờ duyệt' | 'Đã duyệt' | 'Từ chối';
 
 export interface FieldChangeDetail {
   label: string;
